@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import java.util.List;
+import java.util.ArrayList;
 
 @Entity
 @Table(name = "users") // Ensure this matches your table name
@@ -24,13 +26,15 @@ public class User {
     @Column(unique = true, nullable = false)
     private String email;
 
-    @NotBlank(message = "Password is required")
-    @Size(min = 6, message = "Password must be at least 6 characters long")
     private String password;
 
     @NotNull(message = "Role is required")
     @Enumerated(EnumType.STRING)
     private Role role;
+    
+    @OneToMany(mappedBy = "createdBy")
+    private List<Party> parties = new ArrayList<>(); // List of parties created by this user
+
 
     // Getters and Setters
 

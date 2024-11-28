@@ -32,10 +32,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // Exclude endpoints that don't require authentication
         String requestPath = request.getRequestURI();
+    	System.out.println("REQUEST PATH: "+requestPath);
         if (!requestPath.startsWith("/api/admin")) {
             // Path doesn't start with "/api/admin", so skip processing
+        	System.out.println("SKIPPING");
             filterChain.doFilter(request, response);
             return;
+            
         }
 
 

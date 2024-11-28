@@ -70,6 +70,18 @@ public class AdminController {
         // Placeholder for actual dashboard logic
         return ResponseEntity.ok("Welcome to your dashboard, " + username);
     }
+    
+    /**
+     * Get authenticated user from the SecurityContext.
+     */
+    private Optional<User> getAuthenticatedUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof UserDetails)) {
+            return Optional.empty();
+        }
+        String username = ((UserDetails) authentication.getPrincipal()).getUsername();
+        return userRepository.findByEmail(username);
+    }
 
     /**
      * Endpoint for user parties.
@@ -77,91 +89,62 @@ public class AdminController {
      */
     @GetMapping("/parties")
     public ResponseEntity<?> getParties() {
-        // Retrieve the authenticated user details from the SecurityContext
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof UserDetails)) {
-            return ResponseEntity.status(403).body("Unauthorized access");
+        
+        Optional<User> user = getAuthenticatedUser();
+        if(user.isPresent()) {
+        	List<Party> parties = partiesService.getPartiesByCreator(user.get());
+            
+            // Placeholder for fetching and returning user-specific parties
+            return ResponseEntity.ok("Here are your parties\n"+parties);
+        }else {
+        	return ResponseEntity.status(403).body("Unauthorized access");
         }
-
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-        String username = userDetails.getUsername();
         
-        Optional<User> user = userRepository.findByEmail(username);
-        List<Party> parties = partiesService.getPartiesByCreator(user.get().getId());
-        
-        // Placeholder for fetching and returning user-specific parties
-        return ResponseEntity.ok("Here are your parties, " + username+"\n"+parties);
     }
     
     
     // Endpoint to add a new party
     @PostMapping("/parties/add")
     public ResponseEntity<?> addParty(@RequestBody Party party) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        // Check if authentication is valid
-        if (authentication == null || !(authentication.getPrincipal() instanceof UserDetails)) {
-            return ResponseEntity.status(403).body("Unauthorized access");
-        }
-
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-        String username = userDetails.getUsername();
-
-        Optional<User> user = userRepository.findByEmail(username);
-        if(!user.isEmpty()) {
-        	System.out.println("FOUND USER: "+user.get().getId());
-        	System.out.println(" createdBy: "+party.getCreatedBy());
-
-        }
-
-        if (user.isPresent() && user.get().getId() == party.getCreatedBy()) {
+    	System.out.println("HIT /parties/add");
+    	  Optional<User> user = getAuthenticatedUser();
+          
+        if (user.isPresent() ) {
+        	System.out.println("USER: "+user.get().getName());
+        	System.out.println("PARTY:\n"+party);
+        	party.setCreatedBy(user.get());
             Party createdParty = partiesService.addParty(party);
             return ResponseEntity.ok(createdParty);
         } else {
-            return ResponseEntity.status(403).body("Error adding party: User ID doesn't match created_by");
+            return ResponseEntity.status(403).body("Error adding party");
         }
     }
-
-
 
     
  // New endpoint to add multiple parties
     @PostMapping("/parties/add/bulk")
     public ResponseEntity<?> addMultipleParties(@RequestBody List<Party> parties) {
-    	 Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-         if (authentication == null || !(authentication.getPrincipal() instanceof UserDetails)) {
-             return ResponseEntity.status(403).body("Unauthorized access");
-         }
+  	  	Optional<User> user = getAuthenticatedUser();
 
-         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-         String username = userDetails.getUsername();
-         
-         Optional<User> user = userRepository.findByEmail(username);
          
          List<Party> userParties = user.map(u -> 
          parties.stream()
-                .filter(i -> i.getCreatedBy() == u.getId())
+                .filter(i -> i.getCreatedBy().getId() == u.getId())
                 .collect(Collectors.toList()))
         		.orElse(new ArrayList<>());
         List<Party> createdParties = partiesService.addMultipleParties(userParties);
         return ResponseEntity.ok(createdParties);
     }
     
+    
     @DeleteMapping("/parties/delete/{id}")
     public ResponseEntity<String> deleteParty(@PathVariable Long id) {
-    	Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof UserDetails)) {
-            return ResponseEntity.status(403).body("Unauthorized access");
-        }
+    	Optional<User> user = getAuthenticatedUser();
 
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-        String username = userDetails.getUsername();
-        
-        Optional<User> user = userRepository.findByEmail(username);
         try {
             Optional<Party> party = partiesService.getPartyById(id);
             if(party.isPresent()) {
-            	if(user.isPresent() && user.get().getId() == party.get().getCreatedBy()) {
+            	if(user.isPresent() && user.get().getId() == party.get().getCreatedBy().getId()) {
                     partiesService.deletePartyById(id);
                     return ResponseEntity.ok("Party with ID " + id + " has been deleted successfully.");
             	}else {
@@ -180,15 +163,8 @@ public class AdminController {
    
     @GetMapping("/parties/find/{id}")
     public ResponseEntity<?> findParty(@PathVariable Long id) {
-    	Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof UserDetails)) {
-            return ResponseEntity.status(403).body("Unauthorized access");
-        }
-
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-        String username = userDetails.getUsername();
-        
-        Optional<User> user = userRepository.findByEmail(username);
+  	  	Optional<User> user = getAuthenticatedUser();
+  	  
         try {
             Optional<Party> party = partiesService.getPartyById(id);
             if(party.isPresent()) {
@@ -205,6 +181,26 @@ public class AdminController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An error occurred while finding the party.\n"+ e.getMessage()+"\n"+e.getStackTrace());
         }
+    }
+    
+    @GetMapping("/parties/edit/{id}")
+    public ResponseEntity<?> editParty(@PathVariable Long id, @RequestBody Party newParty){
+  	  	Optional<User> user = getAuthenticatedUser();
+  	  	Optional<Party> foundParty = partiesService.getPartyById(id);
+        try {
+        	if(user.isPresent() && foundParty.isPresent() && user.get().getId() == foundParty.get().getCreatedBy().getId()) {
+            	Party party = partiesService.updateParty(id,  newParty);
+            	return ResponseEntity.ok(party);
+        	}else {
+        		return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User not allowed to edit party "+newParty.getId());
+        	}
+        	
+        } catch (PartyNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Party with ID " + id + " not found. So could not be updated");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An error occurred while trying to update the party.\n"+ e.getMessage()+"\n"+e.getStackTrace());
+        }
+    	
     }
     
 }

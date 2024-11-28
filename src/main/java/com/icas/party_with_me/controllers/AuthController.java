@@ -1,9 +1,10 @@
-package com.icas.party_with_me.security;
+package com.icas.party_with_me.controllers;
 
 import com.icas.party_with_me.data.UserRepository;
 import com.icas.party_with_me.data.DAO.LoginRequest;
 import com.icas.party_with_me.data.DAO.LoginResponse;
 import com.icas.party_with_me.data.DAO.User;
+import com.icas.party_with_me.security.JWTUtil;
 
 import jakarta.validation.Valid;
 

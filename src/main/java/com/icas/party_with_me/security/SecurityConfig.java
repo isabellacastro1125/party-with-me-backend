@@ -41,6 +41,7 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    	System.out.println("HITTING");
         http
             .csrf(csrf -> csrf.disable()) // CSRF protection not needed for stateless APIs
             .authorizeHttpRequests(authorize -> authorize
